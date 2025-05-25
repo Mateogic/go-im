@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 )
 
 // 构建服务端，封装结构体类
@@ -66,6 +67,8 @@ func (this *Server) Handler(conn net.Conn) {
 	// 创建一个新的用户实例
 	user := NewUser(conn, this)
 	user.Online() // 用户上线
+	// 监听用户是否活跃的channel
+	isLive := make(chan bool)
 	// 接收客户端的消息
 	go func() {
 		buf := make([]byte, 4096)
@@ -84,11 +87,26 @@ func (this *Server) Handler(conn net.Conn) {
 			// msg := string(buf[:n-1])                  // 去除\n
 			msg := strings.TrimSpace(string(buf[:n])) // <--- 修改后：使用 TrimSpace 去除首尾空白字符
 			user.DoMsg(msg)
+			isLive <- true // 任意消息表明用户活跃，重置定时器
 		}
 	}()
-	// 让处理每个客户端连接的 Handler goroutine 在完成初始化工作后继续存活，以维持连接的有效性
-	select {}
-
+	for {
+		// 让处理每个客户端连接的 Handler goroutine 在完成初始化工作后继续存活，以维持连接的有效性
+		select {
+		case <-isLive: // 利用case穿透执行下面的代码更新计时器
+		case <-time.After(time.Second * 10):
+			{
+				// 10秒后自动断开连接
+				user.SendMsg("长时间未操作，您已被踢下线")
+				// 销毁资源
+				close(user.C)
+				// 关闭连接
+				conn.Close()
+				// 退出协程
+				return
+			}
+		}
+	}
 }
 
 // 发送广播消息

@@ -66,7 +66,7 @@ func (this *User) DoMsg(msg string) {
 		for _, user := range this.server.OnlineMap {
 			// 发送在线用户列表
 			onlineMsg := "[" + user.Addr + "]" + user.Name + ": 在线...\n"
-			this.OnlineUserQuery(onlineMsg)
+			this.SendMsg(onlineMsg)
 		}
 		this.server.mapLock.Unlock()
 	} else if len(msg) > 7 && msg[:7] == "rename:" { // 修改用户名
@@ -89,7 +89,7 @@ func (this *User) DoMsg(msg string) {
 }
 
 // 查询在线用户
-func (this *User) OnlineUserQuery(msg string) {
+func (this *User) SendMsg(msg string) {
 	// 打印在线用户
 	this.Conn.Write([]byte(msg))
 }
