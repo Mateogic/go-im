@@ -94,7 +94,7 @@ func (this *Server) Handler(conn net.Conn) {
 		// 让处理每个客户端连接的 Handler goroutine 在完成初始化工作后继续存活，以维持连接的有效性
 		select {
 		case <-isLive: // 利用case穿透执行下面的代码更新计时器
-		case <-time.After(time.Second * 10):
+		case <-time.After(time.Second * 100):
 			{
 				// 10秒后自动断开连接
 				user.SendMsg("长时间未操作，您已被踢下线")
