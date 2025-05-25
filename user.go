@@ -1,0 +1,36 @@
+package main
+
+import "net"
+
+type User struct {
+	Name string      // 用户名
+	Addr string      // 客户端的地址
+	C    chan string // 与该用户绑定的消息通道
+	Conn net.Conn    // 与该用户绑定的连接
+}
+
+// 创建一个新的用户实例
+func NewUser(conn net.Conn) *User {
+	// 获取客户端的地址
+	userAddr := conn.RemoteAddr().String()
+	// 创建一个新的用户实例
+	user := &User{
+		Name: userAddr,
+		Addr: userAddr,
+		C:    make(chan string),
+		Conn: conn,
+	}
+	// 启动监听消息的协程
+	go user.ListenMessage()
+	return user
+}
+
+// 监听当前用户的消息通道，将消息发送给对端用户
+func (this *User) ListenMessage() {
+	for {
+		// 读取消息
+		msg := <-this.C
+		// 发送消息
+		this.Conn.Write([]byte(msg + "\n"))
+	}
+}

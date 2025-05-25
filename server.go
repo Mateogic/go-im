@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"sync"
 )
 
 // 构建服务端，封装结构体类
@@ -10,14 +11,22 @@ import (
 type Server struct {
 	IP   string // 服务器IP
 	Port int    // 服务器端口
+	// 在线用户列表
+	OnlineMap map[string]*User // key: 用户名, value: 用户对象
+	mapLock   sync.RWMutex     // 读写锁
+
+	// 用于消息广播的通道
+	Message chan string
 }
 
 // 用于创建一个新的Server实例
 // 接收ip和port参数， 返回一个Server指针
 func NewServer(ip string, port int) *Server {
 	return &Server{
-		IP:   ip,
-		Port: port,
+		IP:        ip,
+		Port:      port,
+		OnlineMap: make(map[string]*User), // 初始化在线用户列表
+		Message:   make(chan string),      // 初始化消息通道
 	}
 }
 
@@ -34,6 +43,9 @@ func (this *Server) Start() {
 	// close listener
 	defer listener.Close()
 
+	// 启动监听消息的协程
+	go this.ListenMessager()
+
 	for {
 		// accept
 		conn, err := listener.Accept()
@@ -48,5 +60,38 @@ func (this *Server) Start() {
 
 // 处理连接的业务
 func (this *Server) Handler(conn net.Conn) {
-	fmt.Println("连接成功")
+	// fmt.Println("连接成功")
+	// 创建一个新的用户实例
+	user := NewUser(conn)
+	// 将上线用户添加到在线用户列表
+
+	this.mapLock.Lock()
+	this.OnlineMap[user.Name] = user
+	this.mapLock.Unlock()
+
+	// 广播当前用户的上线消息
+	this.BroadCast(user, "上线了")
+	// 让处理每个客户端连接的 Handler goroutine 在完成初始化工作后继续存活，以维持连接的有效性
+	select {}
+
+}
+
+// 发送广播消息
+func (this *Server) BroadCast(user *User, msg string) {
+	sendMsg := "[" + user.Addr + "]" + user.Name + ": " + msg
+	this.Message <- sendMsg
+}
+
+// 监听广播消息
+func (this *Server) ListenMessager() {
+	for {
+		// 读取消息
+		msg := <-this.Message
+		// 广播消息给所有在线用户
+		this.mapLock.Lock()
+		for _, user := range this.OnlineMap {
+			user.C <- msg
+		}
+		this.mapLock.Unlock()
+	}
 }
