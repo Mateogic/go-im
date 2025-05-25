@@ -63,15 +63,8 @@ func (this *Server) Start() {
 func (this *Server) Handler(conn net.Conn) {
 	// fmt.Println("连接成功")
 	// 创建一个新的用户实例
-	user := NewUser(conn)
-	// 将上线用户添加到在线用户列表
-
-	this.mapLock.Lock()
-	this.OnlineMap[user.Name] = user
-	this.mapLock.Unlock()
-
-	// 广播当前用户的上线消息
-	this.BroadCast(user, "上线了")
+	user := NewUser(conn, this)
+	user.Online() // 用户上线
 	// 接收客户端的消息
 	go func() {
 		buf := make([]byte, 4096)
@@ -79,10 +72,7 @@ func (this *Server) Handler(conn net.Conn) {
 			n, err := conn.Read(buf)
 			if n == 0 {
 				// 用户下线
-				this.mapLock.Lock()
-				delete(this.OnlineMap, user.Name)
-				this.mapLock.Unlock()
-				this.BroadCast(user, "下线了")
+				user.Offline()
 				return
 			}
 			if err != nil && err != io.EOF {
@@ -91,7 +81,7 @@ func (this *Server) Handler(conn net.Conn) {
 			}
 			// 处理用户的消息
 			msg := string(buf[:n-1]) // 去除\n
-			this.BroadCast(user, msg)
+			user.DoMsg(msg)
 		}
 	}()
 	// 让处理每个客户端连接的 Handler goroutine 在完成初始化工作后继续存活，以维持连接的有效性
