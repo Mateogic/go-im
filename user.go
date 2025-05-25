@@ -60,6 +60,22 @@ func (this *User) Offline() {
 
 // 用户发送广播消息封装
 func (this *User) DoMsg(msg string) {
-	// 发送消息
-	this.server.BroadCast(this, msg)
+	if msg == "who" {
+		// 查询在线用户
+		this.server.mapLock.Lock()
+		for _, user := range this.server.OnlineMap {
+			// 发送在线用户列表
+			onlineMsg := "[" + user.Addr + "]" + user.Name + ": 在线...\n"
+			this.OnlineUserQuery(onlineMsg)
+		}
+		this.server.mapLock.Unlock()
+	} else {
+		this.server.BroadCast(this, msg)
+	}
+}
+
+// 查询在线用户
+func (this *User) OnlineUserQuery(msg string) {
+	// 打印在线用户
+	this.Conn.Write([]byte(msg))
 }
