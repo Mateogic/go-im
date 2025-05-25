@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"sync"
 )
@@ -71,6 +72,28 @@ func (this *Server) Handler(conn net.Conn) {
 
 	// 广播当前用户的上线消息
 	this.BroadCast(user, "上线了")
+	// 接收客户端的消息
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := conn.Read(buf)
+			if n == 0 {
+				// 用户下线
+				this.mapLock.Lock()
+				delete(this.OnlineMap, user.Name)
+				this.mapLock.Unlock()
+				this.BroadCast(user, "下线了")
+				return
+			}
+			if err != nil && err != io.EOF {
+				fmt.Println("conn.Read err:", err)
+				return
+			}
+			// 处理用户的消息
+			msg := string(buf[:n-1]) // 去除\n
+			this.BroadCast(user, msg)
+		}
+	}()
 	// 让处理每个客户端连接的 Handler goroutine 在完成初始化工作后继续存活，以维持连接的有效性
 	select {}
 
