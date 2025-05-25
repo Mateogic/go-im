@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"net"
+	"os"
 )
 
 type Client struct {
@@ -59,7 +61,20 @@ func (client *Client) memu() bool {
 		return false
 	}
 }
-
+func (client *Client) UpdateName() bool {
+	// 更新名称
+	fmt.Println("请输入新的用户名:")
+	fmt.Scanln(&client.Name)
+	// 发送给服务器
+	sendMsg := "rename:" + client.Name + "\n"
+	_, err := client.conn.Write([]byte(sendMsg))
+	if err != nil {
+		fmt.Println("conn.Write err:", err)
+		return false
+	}
+	fmt.Println("更新名称成功")
+	return true
+}
 func (client *Client) Run() {
 	for client.choice != 0 {
 		for client.memu() == false {
@@ -72,11 +87,21 @@ func (client *Client) Run() {
 		case 2:
 			fmt.Println("私聊模式")
 			break
-		case 3:
-			fmt.Println("更新名称")
+		case 3: // 更新名称
+			client.UpdateName()
 			break
 		}
 	}
+}
+
+// 接收处理服务器的消息进行终端打印
+func (client *Client) DealResponse() {
+	io.Copy(os.Stdout, client.conn) // 监听服务器的消息拷贝打印到标准输出，是下面的代码的简化版
+	// for {
+	// 	buf := make([]byte, 4096)
+	// 	client.conn.Read(buf)
+	// 	fmt.Println(buf)
+	// }
 }
 func main() {
 	// 解析命令行参数
@@ -86,6 +111,7 @@ func main() {
 		fmt.Println("=====连接服务器失败=====")
 		return
 	}
+	go client.DealResponse() // 启动协程监听服务器的回执消息
 	fmt.Println("=====连接服务器成功=====")
 	client.Run()
 }
