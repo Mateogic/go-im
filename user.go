@@ -58,9 +58,9 @@ func (this *User) Offline() {
 	this.server.BroadCast(this, "下线了")
 }
 
-// 用户发送广播消息封装
+// 处理用户的消息
 func (this *User) DoMsg(msg string) {
-	if msg == "who" {
+	if msg == "who" { // 查询在线用户
 		// 查询在线用户
 		this.server.mapLock.Lock()
 		for _, user := range this.server.OnlineMap {
@@ -69,6 +69,20 @@ func (this *User) DoMsg(msg string) {
 			this.OnlineUserQuery(onlineMsg)
 		}
 		this.server.mapLock.Unlock()
+	} else if len(msg) > 7 && msg[:7] == "rename:" { // 修改用户名
+		newName := msg[7:]
+		_, ok := this.server.OnlineMap[newName]
+		if ok {
+			this.Conn.Write([]byte("用户名已存在\n"))
+		} else {
+			// 修改用户名
+			this.server.mapLock.Lock()
+			delete(this.server.OnlineMap, this.Name)
+			this.server.OnlineMap[newName] = this
+			this.server.mapLock.Unlock()
+			this.Name = newName
+			this.Conn.Write([]byte("用户名成功修改为" + newName + "\n"))
+		}
 	} else {
 		this.server.BroadCast(this, msg)
 	}
